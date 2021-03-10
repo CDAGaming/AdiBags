@@ -19,12 +19,18 @@ You should have received a copy of the GNU General Public License
 along with AdiBags.  If not, see <http://www.gnu.org/licenses/>.
 --]]
 
-local addonName, addon = ...
+local _, addon = ...
+local LCG = LibStub('LibCustomGlow-1.0')
 
 --<GLOBALS
 local _G = _G
+local BAG_ITEM_QUALITY_COLORS = _G.BAG_ITEM_QUALITY_COLORS
 local BankButtonIDToInvSlotID = _G.BankButtonIDToInvSlotID
 local BANK_CONTAINER = _G.BANK_CONTAINER
+local C_AzeriteEmpoweredItem_IsAzeriteEmpoweredItemByID = _G.C_AzeriteEmpoweredItem.IsAzeriteEmpoweredItemByID
+local C_Soulbinds_IsItemConduitByItemInfo = _G.C_Soulbinds.IsItemConduitByItemInfo
+local C_Item_CanScrapItem = _G.C_Item.CanScrapItem
+local C_Item_DoesItemExist = _G.C_Item.DoesItemExist
 local ContainerFrame_UpdateCooldown = _G.ContainerFrame_UpdateCooldown
 local format = _G.format
 local GetContainerItemID = _G.GetContainerItemID
@@ -33,19 +39,24 @@ local GetContainerItemLink = _G.GetContainerItemLink
 local GetContainerItemQuestInfo = _G.GetContainerItemQuestInfo
 local GetContainerNumFreeSlots = _G.GetContainerNumFreeSlots
 local GetItemInfo = _G.GetItemInfo
-local GetItemQualityColor = _G.GetItemQualityColor
 local hooksecurefunc = _G.hooksecurefunc
+local IsBattlePayItem = _G.IsBattlePayItem
+local IsCorruptedItem = _G.IsCorruptedItem
+local IsCosmeticItem = _G.IsCosmeticItem
 local IsInventoryItemLocked = _G.IsInventoryItemLocked
 local ITEM_QUALITY_COMMON = _G.Enum.ItemQuality.Common
 local ITEM_QUALITY_POOR = _G.Enum.ItemQuality.Poor
 local next = _G.next
 local pairs = _G.pairs
+local REAGENTBANK_CONTAINER = _G.REAGENTBANK_CONTAINER
+local ReagentBankButtonIDToInvSlotID = _G.ReagentBankButtonIDToInvSlotID
 local select = _G.select
 local SetItemButtonDesaturated = _G.SetItemButtonDesaturated
+local SplitContainerItem = _G.SplitContainerItem
 local StackSplitFrame = _G.StackSplitFrame
 local TEXTURE_ITEM_QUEST_BANG = _G.TEXTURE_ITEM_QUEST_BANG
-local TEXTURE_ITEM_QUEST_BORDER = _G.TEXTURE_ITEM_QUEST_BORDER
 local tostring = _G.tostring
+local unpack = _G.unpack
 local wipe = _G.wipe
 --GLOBALS>
 
@@ -64,7 +75,7 @@ local childrenNames = { "Cooldown", "IconTexture", "IconQuestTexture", "Count", 
 
 function buttonProto:OnCreate()
 	local name = self:GetName()
-	for i, childName in pairs(childrenNames ) do
+	for _, childName in pairs(childrenNames) do
 		if not self[childName] then
 			self[childName] = _G[name..childName]
 		end
@@ -75,6 +86,39 @@ function buttonProto:OnCreate()
 	self:SetScript('OnHide', self.OnHide)
 	self:SetWidth(ITEM_SIZE)
 	self:SetHeight(ITEM_SIZE)
+	if ElvUI then
+		self:SetTemplate(nil, true)
+		self:StyleButton()
+		self.IconOverlay:SetInside()
+		if self.IconOverlay2 then
+			self.IconOverlay2:SetInside()
+		end
+	elseif KlixUI then
+		self:SetTemplate("Transparent")
+		self:StyleButton(1)
+	end
+	self:SetNormalTexture(nil)
+	if not self.ScrapIcon then
+		local scrapIcon = self:CreateTexture(nil, "OVERLAY")
+		scrapIcon:SetAtlas("bags-icon-scrappable")
+		scrapIcon:SetWidth(14)
+		scrapIcon:SetHeight(12)
+		scrapIcon:SetPoint("TOPRIGHT", -2, -2)
+		scrapIcon:Hide()
+		self.ScrapIcon = scrapIcon
+	end
+	if not self.QuestIcon then
+		local questIcon = self:CreateFontString(nil, "OVERLAY")
+		questIcon:SetPoint("LEFT", 3, 0)
+		if ElvUI then
+			questIcon:SetFont(ElvUI[1].media.normFont, 30, "OUTLINE")
+		elseif KlixUI then
+			questIcon:SetFont(KlixUI[1].media.font, 30, "OUTLINE")
+		end
+		questIcon:SetTextColor(1, 1, 0)
+		questIcon:SetText("!")
+		self.QuestIcon = questIcon
+	end
 	if self.NewItemTexture then
 		self.NewItemTexture:Hide()
 	end
@@ -292,10 +336,22 @@ function buttonProto:Update()
 	local icon = self.IconTexture
 	if self.texture then
 		icon:SetTexture(self.texture)
-		icon:SetTexCoord(0,1,0,1)
+		if ElvUI then
+			icon:SetTexCoord(unpack(ElvUI[1].TexCoords))
+			icon:SetInside()
+		elseif KlixUI then
+			icon:SetTexCoord(unpack(KlixUI[1].TexCoords))
+			icon:SetInside(nil, 1, 1)
+		end
 	else
-		icon:SetTexture([[Interface\BUTTONS\UI-EmptySlot]])
-		icon:SetTexCoord(12/64, 51/64, 12/64, 51/64)
+		icon:SetTexture()
+		if ElvUI then
+			icon:SetTexCoord(unpack(ElvUI[1].TexCoords))
+			icon:SetInside()
+		elseif KlixUI then
+			icon:SetTexCoord(unpack(KlixUI[1].TexCoords))
+			icon:SetInside(nil, 1, 1)
+		end
 	end
 	local tag = (not self.itemId or addon.db.profile.showBagType) and addon:GetFamilyTag(self.bagFamily)
 	if tag then
@@ -310,9 +366,28 @@ function buttonProto:Update()
 	self:UpdateLock()
 	self:UpdateNew()
 	self:UpdateUpgradeIcon()
+	self:UpdateScrapIcon()
+	self:UpdateOverlay()
+	--self:UpdateQuestIcon()
+	self:UpdateConduitGlow()
+	self:UpdateKlixStyling()
 	if self.UpdateSearch then
 		self:UpdateSearch()
 	end
+	
+	-- Only way i can make the none scrapitems to hide, when the scrappingmachine is opened :S
+	if IsAddOnLoaded("Blizzard_ScrappingMachineUI") then
+		if _G.ScrappingMachineFrame:IsShown() then
+			if not self.ScrapIcon:IsShown() then
+				self.searchOverlay:Show()
+				self:SetAlpha(0.5)
+			end
+		else
+			self.searchOverlay:Hide()
+			self:SetAlpha(1)
+		end
+	end
+	
 	addon:SendMessage('AdiBags_UpdateButton', self)
 end
 
@@ -343,13 +418,18 @@ end
 function buttonProto:UpdateSearch()
 	local _, _, _, _, _, _, _, isFiltered = GetContainerItemInfo(self.bag, self.slot)
 	if isFiltered then
-		self.searchOverlay:Show();
+		self.searchOverlay:Show()
+		self:SetAlpha(0.5)
 	else
-		self.searchOverlay:Hide();
+		self.searchOverlay:Hide()
+		self:SetAlpha(1)
 	end
 end
 
 function buttonProto:UpdateCooldown()
+	if ElvUI then
+		ElvUI[1]:RegisterCooldown(self.Cooldown)
+	end
 	return ContainerFrame_UpdateCooldown(self.bag, self)
 end
 
@@ -358,17 +438,85 @@ function buttonProto:UpdateNew()
 end
 
 function buttonProto:UpdateUpgradeIcon()
-	self.UpgradeIcon:SetShown(IsContainerItemAnUpgrade(self.bag, self.slot) or false)
+	local itemIsUpgrade
+	if _G.PawnIsContainerItemAnUpgrade then
+		itemIsUpgrade = _G.PawnIsContainerItemAnUpgrade(self.bag, self.slot)
+	else
+		itemIsUpgrade = _G.IsContainerItemAnUpgrade(self.bag, self.slot)
+	end
+	self.UpgradeIcon:SetShown(itemIsUpgrade or false)
 end
 
-local function GetBorder(bag, slot, itemId, settings)
+function buttonProto:UpdateScrapIcon()
+	local itemLocation = _G.ItemLocation:CreateFromBagAndSlot(self.bag, self.slot)
+	if itemLocation then
+		self.ScrapIcon:SetShown(addon.db.profile.scrapIndicator and C_Item_DoesItemExist(itemLocation) and C_Item_CanScrapItem(itemLocation) or false)
+	end	
+end
+
+function buttonProto:UpdateQuestIcon()
+	local isQuestItem, questId, isActive = GetContainerItemQuestInfo(self.bag, self.slot)
+	if questId and not isActive then
+		self.QuestIcon:SetAlpha(1)
+	else
+		self.QuestIcon:SetAlpha(0)
+	end
+end
+
+-- Glows
+--------------------------------------------------------------------------------
+-- Pixel glow
+--------------------------------------------------------------------------------
+local function ShowPixelGlow(self, enable)
+	if enable then
+		LCG.PixelGlow_Start(self, addon.db.profile.conduitGlowColor, nil, -0.25, nil, 2, 1, 0)
+	else
+		LCG.PixelGlow_Stop(self)
+	end
+end
+
+--------------------------------------------------------------------------------
+-- Particle glow
+--------------------------------------------------------------------------------
+local function ShowParticleGlow(self, enable)
+	if enable then
+		LCG.AutoCastGlow_Start(self, addon.db.profile.conduitGlowColor, 6, -0.25, 1.5)
+	else
+		LCG.AutoCastGlow_Stop(self)
+	end
+end
+
+function buttonProto:UpdateConduitGlow()
+	local enabled = addon.db.profile.conduitHighlight ~= "none"
+	local isBankButton = BANK_BAG_IDS[self.bag]
+	local soulbindFrameShown = SoulbindViewer and SoulbindViewer:IsShown() and SoulbindViewer:IsVisible()
+	if (not enabled) or (isBankButton) or (not soulbindFrameShown) then return end
+
+	local itemLoc = ItemLocation:CreateFromBagAndSlot(self.bag, self.slot)
+	if (not itemLoc:IsValid()) then return end
+	
+	local isConduit = C_Item.IsItemConduit(itemLoc)
+
+	-- only pixel / particle supported
+	ShowPixelGlow(self, isConduit and addon.db.profile.conduitHighlight == "pixel")
+	ShowParticleGlow(self, isConduit and addon.db.profile.conduitHighlight == "particle")
+end
+
+function buttonProto:UpdateKlixStyling()
+	if ElvUI_KlixUI then
+		self:CreateIconShadow()
+	end
+end
+
+local function GetBorder(bag, slot, settings)
 	if settings.questIndicator then
 		local isQuestItem, questId, isActive = GetContainerItemQuestInfo(bag, slot)
 		if questId and not isActive then
-			return TEXTURE_ITEM_QUEST_BANG
+			--return TEXTURE_ITEM_QUEST_BANG, 1, 1, 0, settings.qualityOpacity
+			return nil, 1, 1, 0, settings.qualityOpacity
 		end
 		if questId or isQuestItem then
-			return TEXTURE_ITEM_QUEST_BORDER
+			return nil, 1, 0.3, 0.3, settings.qualityOpacity
 		end
 	end
 	if not settings.qualityHighlight then
@@ -377,40 +525,90 @@ local function GetBorder(bag, slot, itemId, settings)
 	local _, _, _, quality = GetContainerItemInfo(bag, slot)
 	if quality == ITEM_QUALITY_POOR and settings.dimJunk then
 		local v = 1 - 0.5 * settings.qualityOpacity
-		return true, v, v, v, 1, nil, nil, nil, nil, "MOD"
+		return true, v, v, v, 1, "MOD"
 	end
-	local color = quality ~= ITEM_QUALITY_COMMON and BAG_ITEM_QUALITY_COLORS[quality]
+	local color = settings.allHighlight and BAG_ITEM_QUALITY_COLORS[quality] or quality ~= ITEM_QUALITY_COMMON and BAG_ITEM_QUALITY_COLORS[quality]
 	if color then
-		return [[Interface\Buttons\UI-ActionButton-Border]], color.r, color.g, color.b, settings.qualityOpacity, 14/64, 49/64, 15/64, 50/64, "ADD"
+		return [[Interface\Buttons\UI-ActionButton-Border]], color.r, color.g, color.b, settings.qualityOpacity, "ADD"
 	end
 end
 
 function buttonProto:UpdateBorder(isolatedEvent)
-	local texture, r, g, b, a, x1, x2, y1, y2, blendMode
-	if self.hasItem then
-		texture, r, g, b, a, x1, x2, y1, y2, blendMode = GetBorder(self.bag, self.slot, self.itemLink or self.itemId, addon.db.profile)
+	if ElvUI then
+		self:SetBackdropBorderColor(unpack(ElvUI[1].media.bordercolor))
+	elseif KlixUI then
+		self:SetBackdropBorderColor(unpack(KlixUI[1].media.bordercolor))
 	end
-	if not texture then
-		self.IconQuestTexture:Hide()
+	local texture, r, g, b, a, blendMode
+	if self.hasItem then
+		texture, r, g, b, a, blendMode = GetBorder(self.bag, self.slot, addon.db.profile)
+	end
+	local border = self.IconQuestTexture
+	if not texture and texture ~= nil then
+		border:Hide()
 	else
-		local border = self.IconQuestTexture
 		if texture == true then
-			border:SetVertexColor(1, 1, 1, 1)
-			border:SetColorTexture(r or 1, g or 1, b or 1, a or 1)
+			border:SetColorTexture(r, g, b, a)
+		--elseif texture == TEXTURE_ITEM_QUEST_BANG then
+			--border:SetTexture(texture)
+			--self:SetBackdropBorderColor(r, g, b, a)
 		else
-			border:SetTexture(texture)
-			border:SetVertexColor(r or 1, g or 1, b or 1, a or 1)
+			border:SetTexture()
+			self:SetBackdropBorderColor(r, g, b, a)
 		end
-		border:SetTexCoord(x1 or 0, x2 or 1, y1 or 0, y2 or 1)
+		border:SetTexCoord(0, 1, 0, 1)
+		border:SetInside()
 		border:SetBlendMode(blendMode or "BLEND")
 		border:Show()
 	end
+	
+	self:UpdateQuestIcon() -- place this here, else the questicon wont live update!
+	
 	if self.JunkIcon then
 		local quality = self.hasItem and select(3, GetItemInfo(self.itemLink or self.itemId))
 		self.JunkIcon:SetShown(quality == ITEM_QUALITY_POOR and addon:GetInteractingWindow() == "MERCHANT")
 	end
 	if isolatedEvent then
 		addon:SendMessage('AdiBags_UpdateBorder', self)
+	end
+end
+
+function buttonProto:UpdateOverlay()
+	if self.hasItem then
+		local atlasName
+		local itemIDOrLink = self.itemId or self.itemLink
+		local _, _, _, quality, _, _, _, _, _, _, isBound = GetContainerItemInfo(self.bag, self.slot)
+
+		if C_AzeriteEmpoweredItem_IsAzeriteEmpoweredItemByID(itemIDOrLink) then
+			atlasName = "AzeriteIconFrame"
+		elseif IsCorruptedItem(itemIDOrLink) then
+			atlasName = "Nzoth-inventory-icon"
+		elseif IsCosmeticItem(itemIDOrLink) and not isBound then
+			atlasName = "CosmeticIconFrame"
+		elseif C_Soulbinds_IsItemConduitByItemInfo(itemIDOrLink) then
+			atlasName = "ConduitIconFrame"
+		end
+
+		if atlasName then
+			if atlasName == "ConduitIconFrame" then
+				if not quality or not BAG_ITEM_QUALITY_COLORS[quality] then
+					quality = ITEM_QUALITY_COMMON
+				end
+				local color = BAG_ITEM_QUALITY_COLORS[quality]
+				self.IconOverlay:SetVertexColor(color.r, color.g, color.b)
+				if self.IconOverlay2 then
+					self.IconOverlay2:SetAtlas("ConduitIconFrame-Corners")
+					self.IconOverlay2:Show()
+				end
+			end
+			self.IconOverlay:SetAtlas(atlasName)
+			self.IconOverlay:Show()
+		else
+			self.IconOverlay:Hide()
+			if self.IconOverlay2 then
+				self.IconOverlay2:Hide()
+			end
+		end
 	end
 end
 
@@ -570,7 +768,7 @@ function stackProto:Update()
 	self:UpdateVisibleSlot()
 	self:UpdateCount()
 	if self.button then
-		self.button:Update()
+		self.button:FullUpdate()
 	end
 end
 

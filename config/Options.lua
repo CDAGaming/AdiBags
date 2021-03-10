@@ -377,7 +377,7 @@ local function GetOptions()
 								isPercent = true,
 								min = 0.1,
 								max = 3.0,
-								step = 0.1,
+								step = 0.001,
 								set = function(info, newScale)
 									addon.db.profile.scale = newScale
 									addon:LayoutBags()
@@ -452,6 +452,8 @@ local function GetOptions()
 						type = 'group',
 						inline = true,
 						order = 20,
+						hidden = function() return ElvUI or KlixUI end, -- Hide this section, cause now we skin the bags to match ElvUI!
+						disabled = function() return ElvUI or KlixUI end, -- Disable this section, cause now we skin the bags to match ElvUI!
 						args = {
 							texture = {
 								name = L['Texture'],
@@ -554,11 +556,20 @@ local function GetOptions()
 									return info.handler:IsDisabled(info) or not addon.db.profile.qualityHighlight
 								end,
 							},
+							allHighlight = {
+								name = L['Highlight All'],
+								desc = L['Check this to display borders around no quality items in your bag.'],
+								type = 'toggle',
+								order = 225,
+								disabled = function(info)
+									return info.handler:IsDisabled(info) or not addon.db.profile.qualityHighlight
+								end,
+							},
 							dimJunk = {
 								name = L['Dim junk'],
 								desc = L['Check this to have poor quality items dimmed.'],
 								type = 'toggle',
-								order = 225,
+								order = 230,
 								disabled = function(info)
 									return info.handler:IsDisabled(info) or not addon.db.profile.qualityHighlight
 								end,
@@ -571,11 +582,45 @@ local function GetOptions()
 						type = 'toggle',
 						order = 230,
 					},
+					scrapIndicator = {
+						name = L['Scrap indicator'],
+						desc = L['Check this to display an indicator on scrappable items.'],
+						type = 'toggle',
+						order = 235,
+					},
 					showBagType = {
 						name = L['Bag type'],
 						desc = L['Check this to display a bag type tag in the top left corner of items.'],
 						type = 'toggle',
 						order = 240,
+					},
+					ConduitGlow = {
+						name = L['Conduit Highlight'],
+						type = 'group',
+						inline = true,
+						order = 250,
+						args = {
+							conduitHighlight = {
+								name = "Highlight style",
+								type = 'select',
+								order = 10,
+								width = 'double',
+								values = {
+									none = "None",
+									pixel = "Pixel",
+									particle = "Particle"
+								}
+							},
+							conduitGlowColor = {
+								name = "Highlight color",
+								type = 'color',
+								order = 20,
+								hasAlpha = true,
+								disabled = function()
+									return addon.db.profile.highlight == "none"
+								end,
+							},
+						},
 					},
 					virtualStacks = {
 						name = L['Virtual stacks'],
@@ -679,7 +724,7 @@ end
 LibStub('AceConfig-3.0'):RegisterOptionsTable(addonName, GetOptions)
 
 function addon:OpenOptions(...)
-	AceConfigDialog:SetDefaultSize(addonName, 800, 600)
+	AceConfigDialog:SetDefaultSize(addonName, 850, 650)
 	if select('#', ...) > 0 then
 		self:Debug('OpenOptions =>', select('#', ...), ...)
 		AceConfigDialog:Open(addonName)

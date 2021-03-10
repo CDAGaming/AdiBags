@@ -173,11 +173,32 @@ function containerProto:OnCreate(name, isBank, bagObject)
 	closeButton:SetPoint("TOPRIGHT", -2, -2)
 	addon.SetupTooltip(closeButton, L["Close"])
 	closeButton:SetFrameLevel(frameLevel)
+	if ElvUI then
+		ElvUI[1]:GetModule("Skins"):HandleCloseButton(self.CloseButton) -- ElvUI Mod!
+	elseif KlixUI then
+		KlixUI[1]:GetModule("Skins"):ReskinClose(self.CloseButton) -- ElvUI Mod!
+	end
 
 	local bagSlotButton = CreateFrame("CheckButton", nil, self)
 	bagSlotButton:SetNormalTexture([[Interface\Buttons\Button-Backpack-Up]])
-	bagSlotButton:SetCheckedTexture([[Interface\Buttons\CheckButtonHilight]])
-	bagSlotButton:GetCheckedTexture():SetBlendMode("ADD")
+	if ElvUI then
+		bagSlotButton:SetCheckedTexture(ElvUI[1].media.normTex)
+	elseif KlixUI then
+		bagSlotButton:SetCheckedTexture(KlixUI[1].media.normal)
+	end
+	bagSlotButton:GetCheckedTexture():SetVertexColor(1, .82, 0, 0.5)
+	bagSlotButton:GetCheckedTexture():SetInside(bagSlotButton.backdrop, 0, 0)
+	if ElvUI then
+		ElvUI[1]:GetModule("Skins"):HandleIcon(bagSlotButton:GetNormalTexture(), true)
+	elseif KlixUI then
+		KlixUI[1]:GetModule("Skins"):ReskinIcon(bagSlotButton:GetNormalTexture(), true)
+	end
+	if ElvUI_KlixUI then
+		bagSlotButton:CreateIconShadow()
+		if ElvUI[1].db.KlixUI.general.iconShadow and not IsAddOnLoaded("Masque") then
+			bagSlotButton.ishadow:SetInside(bagSlotButton, 0, 0)
+		end
+	end
 	bagSlotButton:SetScript('OnClick', BagSlotButton_OnClick)
 	bagSlotButton.panel = bagSlotPanel
 	bagSlotButton:SetWidth(18)
@@ -190,10 +211,23 @@ function containerProto:OnCreate(name, isBank, bagObject)
 	headerLeftRegion:AddWidget(bagSlotButton, 50)
 
 	local searchBox = CreateFrame("EditBox", self:GetName().."SearchBox", self, "BagSearchBoxTemplate")
-	searchBox:SetSize(130, 20)
+	if ElvUI then
+		searchBox:SetSize(130, 18)
+	elseif KlixUI then
+		searchBox:SetSize(130, 20)
+	end
 	searchBox:SetFrameLevel(frameLevel)
-	headerRightRegion:AddWidget(searchBox, -10, 130, 0, -1)
+	if ElvUI then
+		headerRightRegion:AddWidget(searchBox, -10, 130, 0, -1)
+	elseif KlixUI then
+		headerRightRegion:AddWidget(searchBox, -10, 130, 0, 0)
+	end
 	tinsert(_G.ITEM_SEARCHBAR_LIST, searchBox:GetName())
+	if ElvUI then
+		ElvUI[1]:GetModule("Skins"):HandleEditBox(searchBox) -- ElvUI Mod!
+	elseif KlixUI then
+		KlixUI[1]:GetModule("Skins"):ReskinInput(searchBox) -- ElvUI Mod!
+	end
 
 	local title = self:CreateFontString(self:GetName().."Title","OVERLAY")
 	self.Title = title
@@ -212,6 +246,8 @@ function containerProto:OnCreate(name, isBank, bagObject)
 	if self.isBank then
 		self:CreateReagentTabButton()
 		self:CreateDepositButton()
+	else
+		self:CreateConfigButton()
 	end
 	self:CreateSortButton()
 
@@ -269,8 +305,17 @@ function containerProto:CreateModuleButton(letter, order, onClick, tooltip)
 	local button = CreateFrame("Button", nil, self, "UIPanelButtonTemplate")
 	button:SetText(letter)
 	button:SetSize(20, 20)
+	--[[button.text = button:CreateFontString(nil, "OVERLAY")
+	button.text:FontTemplate(ElvUI[1].media.font, 11, "OUTLINE")
+	button.text:SetPoint("CENTER", 1, 0)
+	button.text:SetText(letter)]]
 	button:SetScript("OnClick", onClick)
 	button:RegisterForClicks("AnyUp")
+	if ElvUI then
+		ElvUI[1]:GetModule("Skins"):HandleButton(button)
+	elseif KlixUI then
+		KlixUI[1]:GetModule("Skins"):Reskin(button)
+	end
 	if order then
 		self:AddHeaderWidget(button, order)
 	end
@@ -313,7 +358,8 @@ end
 end
 
 function containerProto:CreateDepositButton()
-	local button = self:CreateModuleAutoButton(
+	local button 
+	button = self:CreateModuleAutoButton(
 		"D",
 		0,
 		REAGENTBANK_DEPOSIT,
@@ -331,7 +377,8 @@ function containerProto:CreateDepositButton()
 end
 
 function containerProto:CreateSortButton()
-	self:CreateModuleButton(
+	local button
+	button = self:CreateModuleButton(
 		"S",
 		10,
 		function()
@@ -370,6 +417,18 @@ function containerProto:CreateReagentTabButton()
 				)
 			)
 		end
+	)
+end
+
+function containerProto:CreateConfigButton()
+	local button
+	button = self:CreateModuleButton(
+		"C",
+		11,
+		function()
+			addon:OpenOptions('bags')
+		end,
+		L["Open Config"]
 	)
 end
 
@@ -584,6 +643,20 @@ function containerProto:UpdateSkin()
 		self:SetBackdropBorderColor(0.5, 0.5, 0.5, a)
 	else
 		self:SetBackdropBorderColor(0.5+(0.5*r/m), 0.5+(0.5*g/m), 0.5+(0.5*b/m), a)
+	end
+	
+	-- ElvUI Mod!
+	self:StripTextures()
+	if ElvUI then
+		self:SetTemplate("Transparent")
+	elseif KlixUI then
+		KlixUI[1]:GetModule("Skins"):CreateKlixStyle(self)
+	end
+	if ElvUI_KlixUI or ElvUI_MerathilisUI then
+		self:Styling()
+	end
+	if ElvUI_BenikUI then
+		self:Style("Inside")
 	end
 end
 

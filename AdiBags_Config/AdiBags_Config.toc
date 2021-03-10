@@ -2,7 +2,7 @@
 
 ## Title: AdiBags Configuration
 ## Notes: Adirelle's bag addon.
-## Author: Adirelle
+## Author: Adirelle, Klix
 ## Version: @project-version@
 ## X-Date: @project-date-iso@
 ## X-Part-Of: AdiBags

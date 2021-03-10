@@ -19,7 +19,7 @@ You should have received a copy of the GNU General Public License
 along with AdiBags.  If not, see <http://www.gnu.org/licenses/>.
 --]]
 
-local addonName, addon = ...
+local _, addon = ...
 local L = addon.L
 
 --<GLOBALS
@@ -49,6 +49,7 @@ local GetItemInfo = _G.GetItemInfo
 local GetNumBankSlots = _G.GetNumBankSlots
 local ipairs = _G.ipairs
 local IsInventoryItemLocked = _G.IsInventoryItemLocked
+local max = _G.max
 local next = _G.next
 local NUM_BAG_SLOTS = _G.NUM_BAG_SLOTS
 local NUM_BANKGENERIC_SLOTS = _G.NUM_BANKGENERIC_SLOTS
@@ -58,12 +59,14 @@ local PickupBagFromSlot = _G.PickupBagFromSlot
 local PickupContainerItem = _G.PickupContainerItem
 local PlaySound = _G.PlaySound
 local PutItemInBag = _G.PutItemInBag
+local REAGENTBANK_CONTAINER = _G.REAGENTBANK_CONTAINER
 local select = _G.select
 local SetItemButtonDesaturated = _G.SetItemButtonDesaturated
 local SetItemButtonTexture = _G.SetItemButtonTexture
 local SetItemButtonTextureVertexColor = _G.SetItemButtonTextureVertexColor
 local StaticPopup_Show = _G.StaticPopup_Show
 local strjoin = _G.strjoin
+local strsplit = _G.strsplit
 local tinsert = _G.tinsert
 local tsort = _G.table.sort
 local unpack = _G.unpack
@@ -102,7 +105,7 @@ do
 		local maxStack = select(8, GetItemInfo(itemId)) or 1
 		addon:Debug('FindSlotForItem', itemId, GetItemInfo(itemId), 'count=', itemCount, 'maxStack=', maxStack, 'family=', itemFamily, 'bags:', unpack(bags))
 		local bestBag, bestSlot, bestScore
-		for i, bag in pairs(bags) do
+		for _, bag in pairs(bags) do
 			local scoreBonus = band(select(2, GetContainerNumFreeSlots(bag)) or 0, itemFamily) ~= 0 and maxStack or 0
 			for slot = 1, GetContainerNumSlots(bag) do
 				local texture, slotCount, locked = GetContainerItemInfo(bag, slot)
@@ -422,6 +425,19 @@ local function Panel_UpdateSkin(self)
 	else
 		self:SetBackdropBorderColor(0.5+(0.5*r/m), 0.5+(0.5*g/m), 0.5+(0.5*b/m), a)
 	end
+
+	self:StripTextures()
+	if ElvUI then
+		self:SetTemplate("Transparent")
+	elseif KlixUI then
+		KlixUI[1]:GetModule("Skins"):CreateKlixStyle(self)
+	end
+	if ElvUI_KlixUI or ElvUI_MerathilisUI then
+		self:Styling()
+	end
+	if ElvUI_BenikUI then
+		self:Style("Inside")
+	end
 end
 
 local function Panel_ConfigChanged(self, event, name)
@@ -436,7 +452,11 @@ end
 
 function addon:CreateBagSlotPanel(container, name, bags, isBank)
 	local self = CreateFrame("Frame", container:GetName().."Bags", container, "BackdropTemplate")
-	self:SetPoint("BOTTOMLEFT", container, "TOPLEFT", 0, 4)
+	if ElvUI then
+		self:SetPoint("BOTTOMLEFT", container, "TOPLEFT", 0, 4)
+	elseif KlixUI then
+		self:SetPoint("BOTTOMLEFT", container, "TOPLEFT", 0, 7)
+	end
 
 	self.openSound = isBank and SOUNDKIT.IG_MAINMENU_OPEN or SOUNDKIT.IG_BACKPACK_OPEN
 	self.closeSound = isBank and SOUNDKIT.IG_MAINMENU_CLOSE or SOUNDKIT.IG_BACKPACK_CLOSE
@@ -454,13 +474,24 @@ function addon:CreateBagSlotPanel(container, name, bags, isBank)
 	self.buttons = {}
 	local buttonClass = isBank and bankButtonClass or bagButtonClass
 	local x = BAG_INSET
-	local height = 0
-	for i, bag in ipairs(bags) do
+	for _, bag in ipairs(bags) do
 		if bag ~= BACKPACK_CONTAINER and bag ~= BANK_CONTAINER and bag ~= REAGENTBANK_CONTAINER then
 			local button = buttonClass:Create(bag)
 			button:SetParent(self)
 			button:SetPoint("TOPLEFT", x, -TOP_PADDING)
 			button:Show()
+			button:SetTemplate(nil, true)
+			button:StyleButton()
+			button:SetNormalTexture(nil)
+			if ElvUI then
+				button.icon:SetTexCoord(unpack(ElvUI[1].TexCoords))
+			elseif KlixUI then
+				button.icon:SetTexCoord(unpack(KlixUI[1].TexCoords))
+			end
+			button.icon:SetInside()
+			if ElvUI_KlixUI then
+				button:CreateIconShadow()
+			end
 			x = x + ITEM_SIZE + ITEM_SPACING
 			tinsert(self.buttons, button)
 		end

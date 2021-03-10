@@ -21,15 +21,17 @@
 
 ## Title: AdiBags
 ## Notes: Adirelle's bag addon.
-## Author: Adirelle
+## Author: Adirelle, Klix
 ## Version: @project-version@
 ## SavedVariables: AdiBagsDB
 ## X-Date: @project-date-iso@
 ## X-License: GPL v3
-## OptionalDeps: LibStub, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, Scrap, BrainDead, !BugGrabber, SyLevel
+## OptionalDeps: ElvUI, ElvUI_KlixUI, ElvUI_MerathilisUI, ElvUI_BenikUI, KlixUI, LibStub, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, Scrap, BrainDead, !BugGrabber, SyLevel
 #@alpha@
 ## OptionalDeps: AdiDebug, BugSack, Swatter
 #@end-alpha@
+
+Loading.lua
 
 #@no-lib-strip@
 libs\LibStub\LibStub.lua
@@ -40,6 +42,7 @@ libs\AceDB-3.0\AceDB-3.0.xml
 libs\AceHook-3.0\AceHook-3.0.xml
 libs\AceConsole-3.0\AceConsole-3.0.xml
 libs\LibSharedMedia-3.0\lib.xml
+libs\LibCustomGlow-1.0\LibCustomGlow-1.0.lua
 #@end-no-lib-strip@
 
 libs\LibDataBroker-1.1\LibDataBroker-1.1.lua

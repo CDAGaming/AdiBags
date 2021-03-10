@@ -21,6 +21,7 @@ along with AdiBags.  If not, see <http://www.gnu.org/licenses/>.
 
 local addonName, addon = ...
 local L = addon.L
+local LCG = LibStub('LibCustomGlow-1.0')
 
 --<GLOBALS
 local _G = _G
@@ -50,7 +51,7 @@ local newItems = {}
 function mod:OnInitialize()
 	self.db = addon.db:RegisterNamespace(self.moduleName, {
 		profile = {
-			highlight = "legacy",
+			highlight = "particle",
 			glowScale = 1.5,
 			glowColor = { 0.3, 1, 0.3, 0.7 },
 			ignoreJunk = false,
@@ -117,6 +118,8 @@ function mod:UpdateButton(event, button)
 	local isNew = self:IsNew(button.bag, button.slot, button.itemLink)
 	self:ShowLegacyGlow(button, isNew and mod.db.profile.highlight == "legacy")
 	self:ShowBlizzardGlow(button, isNew and mod.db.profile.highlight == "blizzard")
+	self:ShowPixelGlow(button, isNew and mod.db.profile.highlight == "pixel")
+	self:ShowParticleGlow(button, isNew and mod.db.profile.highlight == "particle")
 	self:UpdateModuleButton()
 end
 
@@ -172,7 +175,9 @@ function mod:GetOptions()
 			values = {
 				none = L["None"],
 				legacy = L["Legacy"],
-				blizzard = L["6.0"]
+				blizzard = L["6.0"],
+				pixel = L["Pixel"],
+				particle = L["Particle"]
 			}
 		},
 		glowScale = {
@@ -184,12 +189,18 @@ function mod:GetOptions()
 			isPercent = true,
 			bigStep = 0.05,
 			order = 20,
+			disabled = function()
+				return mod.db.profile.highlight == "none" or mod.db.profile.highlight == "blizzard" or mod.db.profile.highlight == "pixel" 
+			end,
 		},
 		glowColor = {
 			name = L['Highlight color'],
 			type = 'color',
 			order = 30,
 			hasAlpha = true,
+			disabled = function()
+				return mod.db.profile.highlight == "none" or  mod.db.profile.highlight == "blizzard"
+			end,
 		},
 		ignoreJunk = {
 			name = L['Ignore low quality items'],
@@ -201,6 +212,7 @@ function mod:GetOptions()
 				self:SendMessage('AdiBags_UpdateAllButtons', true)
 			end,
 			width = 'double',
+			disabled = function() return mod.db.profile.highlight == "none" end,
 		},
 	}, addon:GetOptionHandler(self)
 end
@@ -218,6 +230,11 @@ function mod:ShowBlizzardGlow(button, enable)
 			button.NewItemTexture:SetAtlas("bags-glow-white")
 		end
 		button.NewItemTexture:Show()
+		if ElvUI then
+			button.NewItemTexture:SetTexCoord(unpack(ElvUI[1].TexCoords))
+		elseif KlixUI then
+			button.NewItemTexture:SetTexCoord(unpack(KlixUI[1].TexCoords))
+		end
 		if not button.flashAnim:IsPlaying() and not button.newitemglowAnim:IsPlaying() then
 			button.flashAnim:Play()
 			button.newitemglowAnim:Play()
@@ -282,5 +299,29 @@ function mod:ShowLegacyGlow(button, enable)
 		glow:Show()
 	elseif glow then
 		glow:Hide()
+	end
+end
+
+--------------------------------------------------------------------------------
+-- Pixel glow
+--------------------------------------------------------------------------------
+
+function mod:ShowPixelGlow(button, enable)
+	if enable then
+		LCG.PixelGlow_Start(button, mod.db.profile.glowColor, nil, -0.25, nil, 2, 1, 0)
+	else
+		LCG.PixelGlow_Stop(button)
+	end
+end
+
+--------------------------------------------------------------------------------
+-- Particle glow
+--------------------------------------------------------------------------------
+
+function mod:ShowParticleGlow(button, enable)
+	if enable then
+		LCG.AutoCastGlow_Start(button, mod.db.profile.glowColor, 6, -0.25, mod.db.profile.glowScale)
+	else
+		LCG.AutoCastGlow_Stop(button)
 	end
 end

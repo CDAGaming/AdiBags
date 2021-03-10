@@ -69,6 +69,7 @@ function mod:OnInitialize()
 			ignoreJunk = true,
 			ignoreHeirloom = true,
 			showBattlePetLevels = true,
+			position = "bottom",
 		},
 	})
 	if self.db.profile.colored == true then
@@ -108,7 +109,6 @@ end
 
 local function CreateText(button)
 	local text = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
-	text:SetPoint("TOPLEFT", button, 3, -1)
 	text:Hide()
 	texts[button] = text
 	return text
@@ -161,6 +161,11 @@ function mod:UpdateButton(event, button)
 	if shouldShow then
 		if not text then
 			text = CreateText(button)
+			if settings.position == "top" then
+				text:SetPoint("TOPLEFT", button, 3, -1)
+			else
+				text:SetPoint("BOTTOMRIGHT", button, -1, 3)
+			end
 		end
 		if level then
 			text:SetText(level)
@@ -214,6 +219,7 @@ function mod:GetOptions()
 				none     = L['None'],
 				original = L['Same as InventoryItemLevels'],
 				level    = L['Related to player level'],
+				qualityColor = L['Same as quality colour'],
 			},
 			order = 20,
 			set = SetOptionAndUpdate,
@@ -249,6 +255,16 @@ function mod:GetOptions()
 			type = 'toggle',
 			order = 60,
 			set = SetOptionAndUpdate,
+		},
+		position = {
+			name = L['Itemlevel position'],
+			desc = L['Please do a /rl after changing the itemlevel position.'],
+			type = 'select',
+			order = 70,
+			values = {
+				top = L["Top"],
+				bottom = L["Bottom"],
+			},
 		},
 	}, addon:GetOptionHandler(self)
 end
@@ -409,6 +425,15 @@ do
 		else
 			-- Would this happen ?
 			return 1, 1, 1
+		end
+	end
+	-- Color scheme for quality colors
+	do
+		colorSchemes.qualityColor = function(level, quality)
+			r, g, b, hex = GetItemQualityColor(quality)
+			return r,g,b
+
+
 		end
 	end
 end
