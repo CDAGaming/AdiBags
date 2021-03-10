@@ -164,7 +164,7 @@ function addon:CreateFontOptions(font, title, order)
 				order = 20,
 				min = mediumSize - 8,
 				max = mediumSize + 8,
-				step = 4,
+				step = 1,
 			},
 			color = {
 				name = L['Color'],
